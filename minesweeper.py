@@ -36,8 +36,8 @@ class Minesweeper:
         # create buttons
         self.buttons = dict({})
         self.mines = 0
-        x_coord = 1
-        y_coord = 0
+        x_coord = 0
+        y_coord = 1
         for x in range(0, 100):
             mine = 0
             # tile image changeable for debug reasons:
@@ -58,18 +58,19 @@ class Minesweeper:
                                 x,
                                 [x_coord, y_coord],
                                 0 ]
+
             self.buttons[x][0].bind('<Button-1>', self.lclicked_wrapper(x))
             self.buttons[x][0].bind('<Button-3>', self.rclicked_wrapper(x))
 
             # calculate coords:
-            y_coord += 1
-            if y_coord == 10:
-                y_coord = 0
-                x_coord += 1
+            x_coord += 1
+            if x_coord == 10:
+                y_coord += 1
+                x_coord = 0
         
         # lay buttons in grid
         for key in self.buttons:
-            self.buttons[key][0].grid( row = self.buttons[key][4][0], column = self.buttons[key][4][1] )
+            self.buttons[key][0].grid( row = self.buttons[key][4][1], column = self.buttons[key][4][0] )
 
         # find nearby mines and display number on tile
         for key in self.buttons:
@@ -113,13 +114,14 @@ class Minesweeper:
             pass
 
     def lclicked_wrapper(self, x):
-        return lambda Button: self.lclicked(self.buttons[x])
+        return lambda Button: self.lclicked(self.buttons[x], x)
 
     def rclicked_wrapper(self, x):
-        return lambda Button: self.rclicked(self.buttons[x])
+        return lambda Button: self.rclicked(self.buttons[x], x)
 
-    def lclicked(self, button_data):
+    def lclicked(self, button_data, x):
         if button_data[1] == 1: #if a mine
+            self.print_state(x, False)
             # show all mines and check for flags
             for key in self.buttons:
                 if self.buttons[key][1] != 1 and self.buttons[key][2] == 2:
@@ -129,6 +131,7 @@ class Minesweeper:
             # end game
             self.gameover()
         else:
+            self.print_state(x, True)
             #change image
             if button_data[5] == 0:
                 button_data[0].config(image = self.tile_clicked)
@@ -142,7 +145,7 @@ class Minesweeper:
             if self.clicked == 100 - self.mines:
                 self.victory()
 
-    def rclicked(self, button_data):
+    def rclicked(self, button_data, x):
         # if not clicked
         if button_data[2] == 0:
             button_data[0].config(image = self.tile_flag)
@@ -163,6 +166,36 @@ class Minesweeper:
                 self.correct_flags -= 1
             self.flags -= 1
             self.update_flags()
+
+    def print_state(self, x, good_answer):
+        # This function prints the state of the board surrounding a given cell index
+        row = x/10
+        col = x%10
+        print [row, col]
+        row_range = range(row-2, row+3)
+        col_range = range(col-2,col+3)
+        # If cell is uncovered
+        if self.buttons[x][2] == 0:
+            data = [[self.get_tile_number(row, col) for col in col_range] for row in row_range]
+            data_file = open('data_file.txt', 'a+')
+            data_file.write(str([data, int(good_answer)])+"\n")
+            data_file.close()
+            for row in data:
+                print row
+            print "Should click there?", good_answer
+
+    def get_tile_number(self, row, column):
+        key = row * 10 + column
+        try:
+            # tile is flagged
+            if self.buttons[key][2] == 2:
+                return -2
+            elif self.buttons[key][2] == 0:
+                return -1
+            else:
+                return self.buttons[key][5]
+        except KeyError:
+            return 0
 
     def check_tile(self, key, queue):
         try:
