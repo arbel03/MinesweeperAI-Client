@@ -1,26 +1,23 @@
-Python Tkinter Minesweeper v0.5.1
+Python & MATLAB Minesweeper AI
 ===========================
+Rewriting this Minesweeper game, written in python, to export useful data.
+This data will later be used to create a Minesweeper AI in MATLAB.
 
-Minesweeper game written in Python using Tkinter GUI library.
+Example data recording:
+```
+[[[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+[[[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+[[[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+[[[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 1, -1, 1, 0], [0, 1, -2, 1, 0], [0, 1, 1, 1, 0]], 1]
+[[[0, 0, 3, -2, 4], [1, 1, 3, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+[[[0, 0, 0, 0, 3], [1, 1, 1, 1, 3], [-1, -1, -1, -2, 2], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+[[[1, 1, 1, 1, 3], [-1, -1, 1, -2, 2], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]], 1]
+```
 
-Known bugs:
-----------
-- Tiles cleared from nearby "clean" areas if there is only one mine in between
-- Occasionally mine numbers are displayed incorrectly (1 above actual) at the edges
+-1 is a covered tile
+-2 is a flag
+0 to 8 are numbers that appear on each tile
+0 or 1 at the second index in each row is a good/bad decision
 
-Contents:
-----------
-
-- */minesweeper.py* - The actual python program
-- */images/* - GIF Images ready for usage with Tkinter
-- */images/original* - Original PNG images made with GraphicsGale
-
-To Do:
-----------
-- Fix bugs
-- Clean up duplicate code
-- Have specific number of mines, rather than random
-- Time counter
-- Highscore table
-- Adjustable grid and mine count
-- ...and then some...
+good=no bombs
+bad=bomb exploded :(
