@@ -148,6 +148,8 @@ class Minesweeper:
     def rclicked(self, button_data, x):
         # if not clicked
         if button_data[2] == 0:
+            if button_data[1] == 1:
+                self.print_state(x, False)
             button_data[0].config(image = self.tile_flag)
             button_data[2] = 2
             button_data[0].unbind('<Button-1>')
