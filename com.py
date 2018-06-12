@@ -2,20 +2,22 @@ import urllib
 from json import loads
 
 class Communicator(object):
-
     def __init__(self, ip, port):
         self.ip = ip
         self.port = port
 
-    def is_bomb(self, matrix):
-
+    
+    def get_result(self, matrix):
         url = 'http://' + self.ip + ':' + str(self.port) +'/?' + str(matrix).replace(' ', '')        
         resp = urllib.urlopen(url).read()
+        print resp
         chances = eval('[' + Communicator.__find_between(resp, '[', ']') + ']')
 
-        if chances[0] > chances[1]:
-            return True
-        return False 
+        if chances[0] > 0.7:
+            return 2
+        elif chances[0] < 0.2:
+            return 1
+        return None
 
     @staticmethod    
     def __find_between( s, first, last ):
