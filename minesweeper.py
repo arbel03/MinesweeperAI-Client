@@ -107,7 +107,7 @@ class Tile:
 class Minesweeper:
     ROWS = 10
     COLS = 10
-    BOMBS = 10
+    BOMBS = 7
 
     def __init__(self, master):
         # set up frame
@@ -170,25 +170,34 @@ class Minesweeper:
 
         self.flags = self.mines
         self.game_ended = False
+        self.clicked = False
 
     def solve_myself(self):
         communicator = com.Communicator("132.76.204.248", 8080)
+        count = Minesweeper.COLS * Minesweeper.ROWS
+        indexes = range(count)
         while 1:
             if self.game_ended:
                 break
-            for index in range(Minesweeper.COLS * Minesweeper.ROWS):
+            random.shuffle(indexes)
+            for index in indexes: #random.sample(range(count), count):
                 if self.game_ended:
                     break
                 tile = self.tile_at_index(index)
                 if tile.state == 0:
                     data = self.get_state(index)
                     data = reduce(lambda x, y: x+y, data)
+                    print data
                     result = communicator.get_result(data)
                     if result:
                         if result == 1:
                             self.lclicked(index)
                         elif result == 2:
                             self.rclicked(index)
+                        break
+                    
+                    if not self.clicked:
+                        self.lclicked(index)
 
     def tile_at_index(self, index):
         return self.data[index/Minesweeper.COLS][index%Minesweeper.COLS]
@@ -205,6 +214,9 @@ class Minesweeper:
             for col in range(Minesweeper.COLS):
                 tile_view = self.board.get_view_at((row, col))
                 tile_view.set_tile(self.data[row][col])
+        global root
+        root.update()
+        root.update_idletasks()
 
     def lclicked_wrapper(self, index):
         return lambda x: self.lclicked(index)
@@ -213,6 +225,7 @@ class Minesweeper:
         return lambda x: self.rclicked(index)
 
     def lclicked(self, x):
+        self.clicked = True
         tile = self.tile_at_index(x)
         tile_view = self.board.get_view_at(x)
         if tile.is_mine: #if a mine
