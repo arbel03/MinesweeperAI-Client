@@ -5,159 +5,64 @@ import Tkinter as tk
 import tkMessageBox
 import random
 import com
+from Tkinter import N, S, E, W
+from view import TileFrame, BoardFrame
+from model import Tile
 from collections import deque
-
-class TileFrame(tk.Frame):
-
-    PADDING = int(0.15*50)
-
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        self.canvas = tk.Canvas(self)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-        self.pack_propagate(False)
-        self.tile = None
-
-    def configure(self, event):
-        self.set_tile(self.tile)
-
-    def set_tile(self, tile):
-        if not self.tile:
-            self.bind('<Configure>', self.configure)
-        self.tile = tile
-        self.canvas.delete("all")
-        if tile.state == 1: # Clicked
-            self.uncover()
-            if tile.nearby_mines != 0:
-                self.set_number(tile.nearby_mines)
-            if tile.exploded:
-                self.canvas.create_rectangle(0, 0, self.winfo_width(), self.winfo_height(), fill="red")
-            if tile.is_mine:
-                self.set_image(Minesweeper.MINE_IMAGE)
-        elif tile.state == 2: # Flagged
-            self.cover()
-            self.set_image(Minesweeper.FLAG_IMAGE)
-            if not tile.is_mine:
-                self.show_wrong_flag()
-        elif tile.state == 0:
-            self.cover()
-
-    def show_wrong_flag(self):
-        width = self.winfo_width()
-        height = self.winfo_height()
-        self.canvas.create_line(TileFrame.PADDING, TileFrame.PADDING, width-TileFrame.PADDING, height-TileFrame.PADDING, fill='black')
-        self.canvas.create_line(width-TileFrame.PADDING, TileFrame.PADDING, TileFrame.PADDING, height-TileFrame.PADDING, fill='black')
-
-    def cover(self):
-        width = self.winfo_width()
-        height = self.winfo_height()
-        left_side = [0, 0, TileFrame.PADDING, TileFrame.PADDING, TileFrame.PADDING, height - TileFrame.PADDING, width - TileFrame.PADDING, height - TileFrame.PADDING, width, height, 0, height, 0, 0]
-        self.canvas.create_polygon(left_side, fill='white')
-        right_side = [0, 0, TileFrame.PADDING, TileFrame.PADDING, width - TileFrame.PADDING, TileFrame.PADDING, width - TileFrame.PADDING, height - TileFrame.PADDING, width, height, width, 0, 0, 0]
-        self.canvas.create_polygon(right_side, fill='#8C8C8C')
-
-    def set_image(self, image):
-        self.canvas.create_image(25, 25, image=image)
-        
-    def uncover(self):
-        width = self.winfo_width()
-        height = self.winfo_height()
-        self.canvas.create_rectangle(0, 0, width, height, fill="#C0C0C0")
-
-    def set_number(self, number):
-        colors = ['#0100FE', '#017F01', '#FE0000', '#010080', '#810102', '#008081', '#000000', '#7E7E7E']
-        self.canvas.create_text(25, 25, fill=colors[number-1], font="Times 24 bold", text=str(number), anchor=tk.CENTER)
-
-class BoardFrame(tk.Frame):
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        self.board_size = (0, 0)
-        self.buttons = list()
-
-    def set_board(self, board_size):
-        from Tkinter import N, S, E, W
-        self.board_size = board_size
-        (rows, columns) = self.board_size
-        for row in range(rows):
-            row_list = list()
-            for column in range(columns):
-                tile = TileFrame(self, width=50, height=50)
-                tile.grid(row=row, column=column, sticky=N+S+E+W)
-                row_list.append(tile)
-            self.buttons.append(row_list) 
-            self.grid_rowconfigure(row, weight=1)
-
-        for col in range(columns):
-            self.grid_columnconfigure(col, weight=1)
-
-    def get_view_at(self, index_or_pos):
-        if type(index_or_pos) == tuple:
-            return self.buttons[index_or_pos[0]][index_or_pos[1]]
-        else:
-            cols = self.board_size[1]
-            return self.buttons[index_or_pos/cols][index_or_pos%cols]
-
-class Tile:
-    def __init__(self):
-        self.is_mine = False
-        self.state = 0 # 0 = unclicked, 1 = clicked, 2 = flagged
-        self.nearby_mines = 0
-        self.exploded = False
 
 class Minesweeper:
     ROWS = 10
     COLS = 10
-    BOMBS = 7
+    BOMBS = 10
 
     def __init__(self, master):
         # set up frame
         frame = tk.Frame(master)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        # create flag and clicked tile variables
-        self.flags = 0
-        self.mines = 0
-
-        # Add UI elements
-        from Tkinter import N, S, E, W
-
-        self.label2 = tk.Label(frame, text = "Mines: "+str(self.mines))
-        self.label2.grid(row=0, column=0, sticky=N+W)
-
-        self.label3 = tk.Label(frame, text = "Flags: "+str(self.flags))
-        self.label3.grid(row=0, column=1, sticky=N+E)
-        
-        self.board = BoardFrame(frame)
-        self.board.grid(row=1, column=0, columnspan=2, sticky=N+S+E+W)
-        self.board.set_board((Minesweeper.ROWS, Minesweeper.COLS))
-        frame.grid_rowconfigure(1, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_columnconfigure(1, weight=1)
-
-        frame.grid_propagate(True)
-        self.board.grid_propagate(True)
-        # create buttons
         self.data = list()
+        self.game_ended = False
+        self.clicked = False
 
+        self.board = BoardFrame(frame)
+        self.board.grid(row=0, column=0, sticky=N+S+E+W)
+        self.board.set_board((Minesweeper.ROWS, Minesweeper.COLS))
+        self.board.grid_propagate(True)
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_propagate(True)
+
+        self.set_board()
+        self.place_bombs()
+
+        for index in range(Minesweeper.ROWS*Minesweeper.COLS):
+            self.board.get_view_at(index).canvas.bind('<Button-1>', self.lclicked_wrapper(index))
+            self.board.get_view_at(index).canvas.bind('<Button-3>', self.rclicked_wrapper(index))
+
+        self.update()
+
+    def set_board(self):
+        # Initialize board with empty tiles
         for _ in range(Minesweeper.ROWS):
             row_list = list()
             for _ in range(Minesweeper.COLS):
                 row_list.append(Tile())
             self.data.append(row_list)
 
-        for index in range(Minesweeper.ROWS*Minesweeper.COLS):
-            self.board.get_view_at(index).set_tile(self.tile_at_index(index))
-            self.board.get_view_at(index).canvas.bind('<Button-1>', self.lclicked_wrapper(index))
-            self.board.get_view_at(index).canvas.bind('<Button-3>', self.rclicked_wrapper(index))
-
-        while self.mines < Minesweeper.BOMBS:
+    def place_bombs(self):
+        mines = 0
+        # Looping while we haven't placed anough bombs.
+        while mines < Minesweeper.BOMBS:
             while True:
+                # Chosing a random place to place a bomb at.
                 bomb_index = random.randint(0, Minesweeper.COLS * Minesweeper.ROWS - 1)
                 tile = self.tile_at_index(bomb_index)
+                # If the chosen random place is not already a bomb, place a bomb there
                 if not tile.is_mine:
                     tile.is_mine = True
-                    self.mines += 1
+                    mines += 1
 
+                    # Setting bomb count for tiles around the placed bomb
                     pos = (bomb_index/Minesweeper.COLS, bomb_index%Minesweeper.COLS)
                     for row in range(max(pos[0]-1, 0), pos[0]+2):
                         for col in range(max(pos[1]-1, 0), pos[1]+2):
@@ -168,36 +73,34 @@ class Minesweeper:
                                 continue
                     break
 
-        self.flags = self.mines
-        self.game_ended = False
-        self.clicked = False
-
     def solve_myself(self):
-        communicator = com.Communicator("132.76.204.248", 8080)
+        communicator = com.Communicator("192.168.1.29", 8080)
         count = Minesweeper.COLS * Minesweeper.ROWS
         indexes = range(count)
-        while 1:
-            if self.game_ended:
-                break
+        while not self.game_ended:
             random.shuffle(indexes)
-            for index in indexes: #random.sample(range(count), count):
+            for index in indexes:
                 if self.game_ended:
                     break
                 tile = self.tile_at_index(index)
                 if tile.state == 0:
+                    # Getting data for chosen index.
                     data = self.get_state(index)
-                    data = reduce(lambda x, y: x+y, data)
-                    print data
+                    data = reduce(lambda x,y: x+y, data)
+                    print index
+                    if not self.clicked:
+                        self.lclicked(index)
+
+                    # Getting the result, should we click there or no?
                     result = communicator.get_result(data)
+                    print result
                     if result:
                         if result == 1:
                             self.lclicked(index)
                         elif result == 2:
                             self.rclicked(index)
                         break
-                    
-                    if not self.clicked:
-                        self.lclicked(index)
+        print "Game ended"
 
     def tile_at_index(self, index):
         return self.data[index/Minesweeper.COLS][index%Minesweeper.COLS]
@@ -232,7 +135,7 @@ class Minesweeper:
             self.print_state(x, False)
             tile.exploded = True
             # end game
-            self.gameover()
+            self.gameover(False)
             return
         else:
             self.print_state(x, True)
@@ -252,17 +155,14 @@ class Minesweeper:
         # if not clicked
         if tile.state == 0:
             if tile.is_mine:
+                print "Correct flag"
                 self.print_state(x, False)
             tile.state = 2
             tile_view.unbind('<Button-1>')
-            self.flags += 1
-            self.update_flags()
         # if flagged, unflag
         elif tile.state == 2:
             tile.state = 0
             tile_view.bind('<Button-1>', self.lclicked_wrapper(x))
-            self.flags -= 1
-            self.update_flags()
         self.update()
 
     def get_state(self, x):
@@ -270,9 +170,9 @@ class Minesweeper:
         # This function prints the state of the board surrounding a given cell index
         row = x/10
         col = x%10
-        print [row, col]
         row_range = range(row-2, row+3)
         col_range = range(col-2,col+3)
+
         # If cell is uncovered
         return [[self.get_tile_number(row, col) for col in col_range] for row in row_range]
 
@@ -289,6 +189,8 @@ class Minesweeper:
 
     def get_tile_number(self, row, column):
         try:
+            if row < 0 or column < 0:
+                raise IndexError
             tile = self.data[row][column]
             # tile is flagged
             if tile.state == 2:
@@ -298,7 +200,7 @@ class Minesweeper:
             else:
                 return tile.nearby_mines
         except IndexError:
-            return 0
+            return -1
 
     def check_tile(self, pos, queue):
         try:
@@ -328,26 +230,18 @@ class Minesweeper:
                 self.board.get_view_at((row, col)).canvas.unbind('<Button-3>')
                 self.board.get_view_at((row, col)).canvas.unbind('<Button-1>')
 
-    def gameover(self):
-        # show all mines and check for flags
-        for row in range(Minesweeper.ROWS):
-            for col in range(Minesweeper.COLS):
-                tile = self.data[row][col]
-                if tile.is_mine and tile.state == 0:
-                    # Uncover bomb
-                    tile.state = 1
+    def gameover(self, iswin):
+        self.ignore_interaction()
+        if not iswin:
+            for row in range(Minesweeper.ROWS):
+                for col in range(Minesweeper.COLS):
+                    tile = self.data[row][col]
+                    if tile.state == 0:
+                        # Uncover bomb
+                        tile.state = 1
         self.update()
-        self.ignore_interaction()
-        tkMessageBox.showinfo("Game Over", "You Lose!")
+        tkMessageBox.showinfo("You won" if iswin else "You lose", "You Lose!")
         self.game_ended = True
-
-    def victory(self):
-        self.ignore_interaction()
-        tkMessageBox.showinfo("Game Over", "You Win!")
-        self.game_ended = True
-
-    def update_flags(self):
-        self.label3.config(text = "Flags: "+str(self.flags))
 
 ### END OF CLASSES ###
 
@@ -361,8 +255,8 @@ def main():
     minesweeper = Minesweeper(root)
     root.geometry('500x500+200+200')
 
-    Minesweeper.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
-    Minesweeper.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
+    Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
+    Tile.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
 
     root.after(0, minesweeper.solve_myself)
     # run event loop

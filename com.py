@@ -7,17 +7,15 @@ class Communicator(object):
         self.port = port
     
     def get_result(self, matrix):
-        url = 'http://' + self.ip + ':' + str(self.port) +'/?' + str(matrix).replace(' ', '')        
+        url = 'http://' + self.ip + ':' + str(self.port) +'/?' + str(matrix).replace(' ', '')
         resp = urllib.urlopen(url).read()
-        print resp
         chances = eval('[' + Communicator.__find_between(resp, '[', ']') + ']')
+        print chances 
 
-        if chances[0] > 0.77:
-            # Put flag
-            return 2
-        elif chances[0] < 0.05:
-            # Reveal
-            return 1
+        if chances[0] > 0.7:
+            return 1 # Reveal
+        elif chances[0] < 0.3:
+            return 2 # Flag
         return None
 
     @staticmethod    
