@@ -10,16 +10,14 @@ class Communicator(object):
         url = 'http://' + self.ip + ':' + str(self.port) +'/?' + str(matrix).replace(' ', '')
         resp = urllib.urlopen(url).read()
         chances = eval('[' + Communicator.__find_between(resp, '[', ']') + ']')
-        print chances 
-
-        if chances[0] > 0.7:
-            return 1 # Reveal
-        elif chances[0] < 0.3:
+        print "Is a bomb?", chances[0]
+        if chances[0] >= 0.95:
             return 2 # Flag
-        return None
+        elif chances[0] < 0.19:
+            return 1 # Reveal
 
     @staticmethod    
-    def __find_between( s, first, last ):
+    def __find_between(s, first, last):
         try:
             start = s.index( first ) + len( first )
             end = s.index( last, start )

@@ -22,7 +22,6 @@ class Minesweeper:
 
         self.data = list()
         self.game_ended = False
-        self.clicked = False
 
         self.board = BoardFrame(frame)
         self.board.grid(row=0, column=0, sticky=N+S+E+W)
@@ -43,11 +42,16 @@ class Minesweeper:
 
     def set_board(self):
         # Initialize board with empty tiles
-        for _ in range(Minesweeper.ROWS):
+        for row in range(Minesweeper.ROWS):
             row_list = list()
-            for _ in range(Minesweeper.COLS):
-                row_list.append(Tile())
+            for column in range(Minesweeper.COLS):
+                row_list.append(Tile(row*Minesweeper.COLS+column))
             self.data.append(row_list)
+
+    def get_covered_tiles(self):
+        data = reduce(lambda x,y: x+y, self.data)
+        covered_tiles = filter(lambda tile: tile.state == 0, data)
+        return covered_tiles
 
     def place_bombs(self):
         mines = 0
@@ -73,34 +77,11 @@ class Minesweeper:
                                 continue
                     break
 
-    def solve_myself(self):
-        communicator = com.Communicator("192.168.1.29", 8080)
-        count = Minesweeper.COLS * Minesweeper.ROWS
-        indexes = range(count)
-        while not self.game_ended:
-            random.shuffle(indexes)
-            for index in indexes:
-                if self.game_ended:
-                    break
-                tile = self.tile_at_index(index)
-                if tile.state == 0:
-                    # Getting data for chosen index.
-                    data = self.get_state(index)
-                    data = reduce(lambda x,y: x+y, data)
-                    print index
-                    if not self.clicked:
-                        self.lclicked(index)
-
-                    # Getting the result, should we click there or no?
-                    result = communicator.get_result(data)
-                    print result
-                    if result:
-                        if result == 1:
-                            self.lclicked(index)
-                        elif result == 2:
-                            self.rclicked(index)
-                        break
-        print "Game ended"
+    def amount_open_around(self, index):
+        state = self.get_state(index, 1)
+        state = reduce(lambda x,y: x+y, state)
+        open_tiles_around = filter(lambda tile_value: tile_value >= 0 or tile_value == -2, state)
+        return len(open_tiles_around)
 
     def tile_at_index(self, index):
         return self.data[index/Minesweeper.COLS][index%Minesweeper.COLS]
@@ -128,7 +109,6 @@ class Minesweeper:
         return lambda x: self.rclicked(index)
 
     def lclicked(self, x):
-        self.clicked = True
         tile = self.tile_at_index(x)
         tile_view = self.board.get_view_at(x)
         if tile.is_mine: #if a mine
@@ -165,13 +145,13 @@ class Minesweeper:
             tile_view.bind('<Button-1>', self.lclicked_wrapper(x))
         self.update()
 
-    def get_state(self, x):
+    def get_state(self, x, radius=2):
         tile = self.tile_at_index(x)
         # This function prints the state of the board surrounding a given cell index
         row = x/10
         col = x%10
-        row_range = range(row-2, row+3)
-        col_range = range(col-2,col+3)
+        row_range = range(row-radius, row+radius+1)
+        col_range = range(col-radius,col+radius+1)
 
         # If cell is uncovered
         return [[self.get_tile_number(row, col) for col in col_range] for row in row_range]
@@ -192,15 +172,15 @@ class Minesweeper:
             if row < 0 or column < 0:
                 raise IndexError
             tile = self.data[row][column]
-            # tile is flagged
-            if tile.state == 2:
+            # tile is flagged, ignore mistakes
+            if tile.state == 2 and tile.is_mine:
                 return -2
             elif tile.state == 0:
                 return -1
             else:
                 return tile.nearby_mines
         except IndexError:
-            return -1
+            return -3
 
     def check_tile(self, pos, queue):
         try:
@@ -231,6 +211,7 @@ class Minesweeper:
                 self.board.get_view_at((row, col)).canvas.unbind('<Button-1>')
 
     def gameover(self, iswin):
+        global root
         self.ignore_interaction()
         if not iswin:
             for row in range(Minesweeper.ROWS):
@@ -240,27 +221,69 @@ class Minesweeper:
                         # Uncover bomb
                         tile.state = 1
         self.update()
-        tkMessageBox.showinfo("You won" if iswin else "You lose", "You Lose!")
+        # tkMessageBox.showinfo("You won" if iswin else "You lose", "You Lose!")
         self.game_ended = True
+        root.destroy()
+
+class Solver:
+    def __init__(self, minesweeper, addr = "127.0.0.1", port = 8080):
+        self.minesweeper = minesweeper
+        self.open_tiles = list()
+        self.communicator = com.Communicator(addr, port)
+
+    def solve(self):
+        global root
+
+        if self.minesweeper.game_ended:
+            return
+        if len(self.open_tiles) == 0:
+            self.open_tiles = self.minesweeper.get_covered_tiles()[::-1]
+        random.shuffle(self.open_tiles)
+        self.open_tiles = filter(lambda tile: tile.state == 0, self.open_tiles)
+        if Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
+            tile = random.choice(self.open_tiles)
+            self.minesweeper.lclicked(tile.index)
+            root.after(10, self.solve)
+            return
+        # Testing only tiles with some other tiles open around them.
+        self.open_tiles = filter(lambda tile: self.minesweeper.amount_open_around(tile.index) >= 3, self.open_tiles)
+        tile = None
+        try:
+            tile = self.open_tiles.pop()
+        except:
+            root.after(10, self.solve)
+        # Getting data for chosen index.
+        data = self.minesweeper.get_state(tile.index)
+        data = reduce(lambda x,y: x+y, data)
+        # Getting the result, should we click there or no?
+        result = self.communicator.get_result(data)
+        if result:
+            if result == 1:
+                self.minesweeper.lclicked(tile.index)
+            elif result == 2:
+                self.minesweeper.rclicked(tile.index)
+        root.after(10, self.solve)
 
 ### END OF CLASSES ###
 
 def main():
-    global root
-    # create Tk widget
-    root = tk.Tk()
-    # set program title
-    root.title("Minesweeper")
-    # create game instance
-    minesweeper = Minesweeper(root)
-    root.geometry('500x500+200+200')
+    while True:
+        global root
+        # create Tk widget
+        root = tk.Tk()
+        # set program title
+        root.title("Minesweeper")
+        # create game instance
+        minesweeper = Minesweeper(root)
+        root.geometry('500x500+200+200')
 
-    Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
-    Tile.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
+        Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
+        Tile.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
 
-    root.after(0, minesweeper.solve_myself)
-    # run event loop
-    root.mainloop()
+        solver = Solver(minesweeper, "10.0.0.30")
+        root.after(0, solver.solve)
+        # run event loop
+        root.mainloop()
 
 if __name__ == "__main__":
     main()
