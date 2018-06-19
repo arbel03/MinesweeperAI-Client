@@ -137,6 +137,9 @@ class Minesweeper:
             if tile.is_mine:
                 print "Correct flag"
                 self.print_state(x, False)
+            else:
+                # No mine, should left click there
+                self.print_state(x, True)
             tile.state = 2
             tile_view.unbind('<Button-1>')
         # if flagged, unflag
@@ -160,12 +163,12 @@ class Minesweeper:
         tile = self.tile_at_index(x)
         if tile.state == 0:
             data = self.get_state(x)
-            data_file = open('data_file.txt', 'a+')
+            data_file = open('input_data.txt', 'a+')
             data_file.write(str([data, int(good_answer)])+"\n")
             data_file.close()
-            for row in data:
-                print row
-            print "Should click there?", good_answer
+            # for row in data:
+            #     print row
+            # print "Should click there?", good_answer
 
     def get_tile_number(self, row, column):
         try:
@@ -231,37 +234,47 @@ class Solver:
         self.open_tiles = list()
         self.communicator = com.Communicator(addr, port)
 
-    def solve(self):
-        global root
-
-        if self.minesweeper.game_ended:
-            return
-        if len(self.open_tiles) == 0:
-            self.open_tiles = self.minesweeper.get_covered_tiles()[::-1]
-        random.shuffle(self.open_tiles)
-        self.open_tiles = filter(lambda tile: tile.state == 0, self.open_tiles)
-        if Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
-            tile = random.choice(self.open_tiles)
-            self.minesweeper.lclicked(tile.index)
-            root.after(10, self.solve)
-            return
-        # Testing only tiles with some other tiles open around them.
-        self.open_tiles = filter(lambda tile: self.minesweeper.amount_open_around(tile.index) >= 3, self.open_tiles)
-        tile = None
-        try:
-            tile = self.open_tiles.pop()
-        except:
-            root.after(10, self.solve)
+    def is_flag_percent(self, tile):
         # Getting data for chosen index.
         data = self.minesweeper.get_state(tile.index)
         data = reduce(lambda x,y: x+y, data)
         # Getting the result, should we click there or no?
-        result = self.communicator.get_result(data)
-        if result:
-            if result == 1:
-                self.minesweeper.lclicked(tile.index)
-            elif result == 2:
-                self.minesweeper.rclicked(tile.index)
+        return self.communicator.get_result(data)
+
+    def solve(self):
+        global root
+        if self.minesweeper.game_ended:
+            return
+
+        self.open_tiles = self.minesweeper.get_covered_tiles()
+        if len(self.open_tiles) == 0:
+            self.minesweeper.gameover(True)
+            return
+
+        if Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) > 10:
+            self.open_tiles = filter(lambda tile: self.minesweeper.amount_open_around(tile.index) >= 3, self.open_tiles)
+
+        chances = map(self.is_flag_percent, self.open_tiles)
+        max_index = chances.index(max(chances)) 
+        (max_tile, max_percent) = self.open_tiles[max_index], chances[max_index]
+        min_index = chances.index(min(chances))
+        (min_tile, min_percent) = self.open_tiles[min_index], chances[min_index]
+    
+        print "Max percent: ", max_percent
+        print "Min percent: ", min_percent
+
+        played = False
+        if max_percent > 0.95:
+            self.minesweeper.rclicked(max_tile.index)
+            played = True
+        if min_percent < 0.1 or Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
+            self.minesweeper.lclicked(min_tile.index)
+            played = True
+
+        # Data was at 1900 lines at the time of this change.
+        if not played:
+            self.minesweeper.gameover(False)
+            return
         root.after(10, self.solve)
 
 ### END OF CLASSES ###
@@ -280,7 +293,7 @@ def main():
         Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
         Tile.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
 
-        solver = Solver(minesweeper, "10.0.0.30")
+        solver = Solver(minesweeper, "127.0.0.1")
         root.after(0, solver.solve)
         # run event loop
         root.mainloop()
