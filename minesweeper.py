@@ -224,7 +224,7 @@ class Minesweeper:
                         # Uncover bomb
                         tile.state = 1
         self.update()
-        # tkMessageBox.showinfo("You won" if iswin else "You lose", "You Lose!")
+        # tkMessageBox.showinfo("You won!" if iswin else "You lost!", "You Lose!")
         self.game_ended = True
         root.destroy()
 
@@ -247,12 +247,10 @@ class Solver:
             return
 
         self.open_tiles = self.minesweeper.get_covered_tiles()
+        # If stuck, start a new game
         if len(self.open_tiles) == 0:
-            self.minesweeper.gameover(True)
+            # self.minesweeper.gameover(True)
             return
-
-        if Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) > 10:
-            self.open_tiles = filter(lambda tile: self.minesweeper.amount_open_around(tile.index) >= 3, self.open_tiles)
 
         chances = map(self.is_flag_percent, self.open_tiles)
         max_index = chances.index(max(chances)) 
@@ -264,17 +262,26 @@ class Solver:
         print "Min percent: ", min_percent
 
         played = False
-        if max_percent > 0.95:
-            self.minesweeper.rclicked(max_tile.index)
-            played = True
         if min_percent < 0.1 or Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
             self.minesweeper.lclicked(min_tile.index)
             played = True
-
-        # Data was at 1900 lines at the time of this change.
+        if max_percent > 0.97:
+            self.minesweeper.rclicked(max_tile.index)
+            played = True
+        if min_percent < 0.08:
+            self.minesweeper.lclicked(min_tile.index)
+            played = True
+    
         if not played:
-            self.minesweeper.gameover(False)
-            return
+            if abs(0.5-max_percent) > abs(0.5-min_percent):
+                self.minesweeper.rclicked(max_tile.index)
+            else:
+                self.minesweeper.lclicked(min_tile.index)
+
+        # if abs(0.5-max_percent) > abs(0.5-min_percent):
+        # else:
+            # if 
+        # # Data was at 1900 lines at the time of this change.
         root.after(10, self.solve)
 
 ### END OF CLASSES ###
