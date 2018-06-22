@@ -22,6 +22,7 @@ class Minesweeper:
 
         self.data = list()
         self.game_ended = False
+        self.clicks = 0
 
         self.board = BoardFrame(frame)
         self.board.grid(row=0, column=0, sticky=N+S+E+W)
@@ -109,6 +110,7 @@ class Minesweeper:
         return lambda x: self.rclicked(index)
 
     def lclicked(self, x):
+        self.clicks += 1
         tile = self.tile_at_index(x)
         tile_view = self.board.get_view_at(x)
         if tile.is_mine: #if a mine
@@ -129,13 +131,14 @@ class Minesweeper:
         self.update()
 
     def rclicked(self, x):
+        self.clicks += 1
         tile = self.tile_at_index(x)
         tile_view = self.board.get_view_at(x)
 
         # if not clicked
         if tile.state == 0:
             if tile.is_mine:
-                print "Correct flag"
+                #print "Correct flag"
                 self.print_state(x, False)
             else:
                 # No mine, should left click there
@@ -150,7 +153,7 @@ class Minesweeper:
 
     def get_state(self, x, radius=2):
         tile = self.tile_at_index(x)
-        # This function prints the state of the board surrounding a given cell index
+        # This function #prints the state of the board surrounding a given cell index
         row = x/10
         col = x%10
         row_range = range(row-radius, row+radius+1)
@@ -167,8 +170,15 @@ class Minesweeper:
             data_file.write(str([data, int(good_answer)])+"\n")
             data_file.close()
             # for row in data:
-            #     print row
-            # print "Should click there?", good_answer
+            #     #print row
+            # #print "Should click there?", good_answer
+
+    def is_win(self):
+        for row in range(Minesweeper.ROWS):
+            for col in range(Minesweeper.COLS):
+                if self.data[row][col].state == 2 and not self.data[row][col].is_mine:
+                    return False
+        return True
 
     def get_tile_number(self, row, column):
         try:
@@ -215,6 +225,7 @@ class Minesweeper:
 
     def gameover(self, iswin):
         global root
+        # print self.clicks
         self.ignore_interaction()
         if not iswin:
             for row in range(Minesweeper.ROWS):
@@ -224,7 +235,8 @@ class Minesweeper:
                         # Uncover bomb
                         tile.state = 1
         self.update()
-        # tkMessageBox.showinfo("You won!" if iswin else "You lost!", "You Lose!")
+        if iswin:
+            tkMessageBox.showinfo("Game ended.", "You Won!")
         self.game_ended = True
         root.destroy()
 
@@ -249,7 +261,10 @@ class Solver:
         self.open_tiles = self.minesweeper.get_covered_tiles()
         # If stuck, start a new game
         if len(self.open_tiles) == 0:
-            # self.minesweeper.gameover(True)
+            if self.minesweeper.is_win():
+                self.minesweeper.gameover(True)
+            else:
+                self.minesweeper.gameover(False)
             return
 
         chances = map(self.is_flag_percent, self.open_tiles)
@@ -257,53 +272,47 @@ class Solver:
         (max_tile, max_percent) = self.open_tiles[max_index], chances[max_index]
         min_index = chances.index(min(chances))
         (min_tile, min_percent) = self.open_tiles[min_index], chances[min_index]
-    
-        print "Max percent: ", max_percent
-        print "Min percent: ", min_percent
 
         played = False
-        if min_percent < 0.1 or Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
+        if min_percent < 0.08 or Minesweeper.COLS * Minesweeper.ROWS - len(self.open_tiles) < 10:
             self.minesweeper.lclicked(min_tile.index)
             played = True
         if max_percent > 0.97:
             self.minesweeper.rclicked(max_tile.index)
             played = True
-        if min_percent < 0.08:
-            self.minesweeper.lclicked(min_tile.index)
-            played = True
-    
+        
         if not played:
             if abs(0.5-max_percent) > abs(0.5-min_percent):
                 self.minesweeper.rclicked(max_tile.index)
             else:
                 self.minesweeper.lclicked(min_tile.index)
 
-        # if abs(0.5-max_percent) > abs(0.5-min_percent):
-        # else:
-            # if 
-        # # Data was at 1900 lines at the time of this change.
-        root.after(10, self.solve)
+        root.after(1, self.solve)
 
 ### END OF CLASSES ###
 
 def main():
     while True:
         global root
-        # create Tk widget
-        root = tk.Tk()
-        # set program title
-        root.title("Minesweeper")
-        # create game instance
-        minesweeper = Minesweeper(root)
-        root.geometry('500x500+200+200')
+        try:
+            # create Tk widget
+            root = tk.Tk()
+            # set program title
+            root.title("Minesweeper")
+            # create game instance
+            minesweeper = Minesweeper(root)
+            root.geometry('500x500+200+200')
 
-        Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
-        Tile.FLAG_IMAGE = tk.PhotoImage(file="images/flag.gif")
+            Tile.MINE_IMAGE = tk.PhotoImage(file = "images/mine.gif")
+            Tile.FLAG_IMAGE = tk.PhotoImage(file = "images/flag.gif")
 
-        solver = Solver(minesweeper, "127.0.0.1")
-        root.after(0, solver.solve)
-        # run event loop
-        root.mainloop()
+            solver = Solver(minesweeper, "127.0.0.1")
+            root.after(0, solver.solve)
+            # run event loop
+            root.mainloop()
+        except KeyboardInterrupt:
+            print "Shutting down."
+            break
 
 if __name__ == "__main__":
     main()
